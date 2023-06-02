@@ -70,7 +70,7 @@ impl Service {
         }
     }
 
-    pub async fn request(&self, messages: &[Message]) -> reqwest::Result<reqwest::Response> {
+    pub async fn request(&self, messages: &Vec<Message>) -> reqwest::Result<reqwest::Response> {
         self.client
             .post("https://api.openai.com/v1/chat/completions")
             .bearer_auth(&self.api_key)
@@ -84,7 +84,7 @@ impl Service {
 
     pub async fn request_and_parse_response(
         &self,
-        messages: &[Message],
+        messages: &Vec<Message>,
     ) -> reqwest::Result<String> {
         let parsed_json = self
             .request(messages)

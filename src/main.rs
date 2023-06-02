@@ -1,3 +1,5 @@
+use std::io::{self, BufRead};
+
 mod chat;
 mod narrator;
 
@@ -11,8 +13,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         content: initial_prompt,
     };
 
-    let resp = chat_service.request_and_parse_response(&[message]).await?;
+    let mut messages = Vec::new();
+    messages.push(message); // TODO: initialize with a vec macro
+
+    let resp = chat_service.request_and_parse_response(&messages).await?;
 
     println!("{:#?}", resp);
+
+    let stdin = io::stdin();
+    for line in stdin.lock().lines() {
+        match line {
+            Ok(line) => {
+                messages.push(chat::Message {
+                    role: chat::Role::User,
+                    content: line,
+                });
+                let resp = chat_service.request_and_parse_response(&messages).await?;
+                println!("{:#?}", resp);
+            }
+            Err(err) => {
+                eprintln!("Error: {}", err);
+                break;
+            }
+        }
+    }
+
     Ok(())
 }
