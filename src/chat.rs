@@ -15,6 +15,73 @@ pub struct Message {
     pub content: String,
 }
 
+#[derive(Deserialize, Debug)]
+pub struct ApiResponse {
+    pub choices: Vec<Choice>,
+}
+
+pub struct Service {
+    client: reqwest::Client,
+    api_key: String,
+    messages: Vec<Message>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Choice {
+    pub message: Message,
+}
+
+impl Service {
+    pub fn new() -> Self {
+        let api_key = env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
+        Self {
+            client: reqwest::Client::new(),
+            messages: Vec::new(),
+            api_key,
+        }
+    }
+
+    pub async fn query(&mut self, content: &String) -> reqwest::Result<String> {
+        self.messages.push(Message {
+            role: Role::User,
+            content: content.clone(),
+        });
+
+        self.submit().await
+    }
+
+    pub async fn submit(&mut self) -> reqwest::Result<String> {
+        let parsed_json = self
+            .request()
+            .await?
+            .error_for_status()?
+            .json::<ApiResponse>()
+            .await?;
+
+        let choice = parsed_json.choices.get(0).unwrap();
+        let content = &choice.message.content;
+
+        self.messages.push(Message {
+            role: Role::Assistant,
+            content: content.clone(),
+        });
+
+        Ok(content.clone())
+    }
+
+    async fn request(&self) -> reqwest::Result<reqwest::Response> {
+        self.client
+            .post("https://api.openai.com/v1/chat/completions")
+            .bearer_auth(&self.api_key)
+            .json(&serde_json::json!({
+                "model": "gpt-3.5-turbo",
+                "messages": &self.messages
+            }))
+            .send()
+            .await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -42,59 +109,5 @@ mod tests {
         let json = serde_json::to_string(&message).unwrap();
 
         assert_eq!(json, r#"{"role":"user","content":"Hello, world!"}"#);
-    }
-}
-
-#[derive(Deserialize, Debug)]
-pub struct ApiResponse {
-    pub choices: Vec<Choice>,
-}
-
-pub struct Service {
-    client: reqwest::Client,
-    api_key: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Choice {
-    pub message: Message,
-}
-
-impl Service {
-    pub fn new() -> Self {
-        let api_key = env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
-
-        Self {
-            client: reqwest::Client::new(),
-            api_key,
-        }
-    }
-
-    pub async fn request(&self, messages: &Vec<Message>) -> reqwest::Result<reqwest::Response> {
-        self.client
-            .post("https://api.openai.com/v1/chat/completions")
-            .bearer_auth(&self.api_key)
-            .json(&serde_json::json!({
-                "model": "gpt-3.5-turbo",
-                "messages": messages
-            }))
-            .send()
-            .await
-    }
-
-    pub async fn request_and_parse_response(
-        &self,
-        messages: &Vec<Message>,
-    ) -> reqwest::Result<String> {
-        let parsed_json = self
-            .request(messages)
-            .await?
-            .error_for_status()?
-            .json::<ApiResponse>()
-            .await?;
-
-        let choice = parsed_json.choices.get(0).unwrap();
-
-        Ok(choice.message.content.clone())
     }
 }
