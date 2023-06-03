@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::env;
 
-#[derive(Deserialize, Serialize, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum Role {
     User,
@@ -9,7 +9,7 @@ pub enum Role {
     System,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Message {
     pub role: Role,
     pub content: String,
@@ -23,7 +23,6 @@ pub struct ApiResponse {
 pub struct Service {
     client: reqwest::Client,
     api_key: String,
-    messages: Vec<Message>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -36,46 +35,32 @@ impl Service {
         let api_key = env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
         Self {
             client: reqwest::Client::new(),
-            messages: Vec::new(),
             api_key,
         }
     }
 
-    pub async fn query(&mut self, content: &String) -> reqwest::Result<String> {
-        self.messages.push(Message {
-            role: Role::User,
-            content: content.clone(),
-        });
+    pub async fn submit(&self, messages: &Vec<Message>) -> reqwest::Result<Message> {
+        eprintln!("SENDING {:?}", messages);
 
-        self.submit().await
-    }
-
-    pub async fn submit(&mut self) -> reqwest::Result<String> {
         let parsed_json = self
-            .request()
+            .request(messages)
             .await?
             .error_for_status()?
             .json::<ApiResponse>()
             .await?;
 
         let choice = parsed_json.choices.get(0).unwrap();
-        let content = &choice.message.content;
 
-        self.messages.push(Message {
-            role: Role::Assistant,
-            content: content.clone(),
-        });
-
-        Ok(content.clone())
+        Ok(choice.message.clone())
     }
 
-    async fn request(&self) -> reqwest::Result<reqwest::Response> {
+    async fn request(&self, messages: &Vec<Message>) -> reqwest::Result<reqwest::Response> {
         self.client
             .post("https://api.openai.com/v1/chat/completions")
             .bearer_auth(&self.api_key)
             .json(&serde_json::json!({
                 "model": "gpt-3.5-turbo",
-                "messages": &self.messages
+                "messages": messages
             }))
             .send()
             .await
