@@ -3,3 +3,5 @@ Let me play an interactive story. Pause regularly to offer me choices.
 Start now, with the introduction, and reply to me in JSON with the following keys:
 - `text` (string): text to display.
 - `choices` (array of strings): possible choices.
+
+Texts should be in french.

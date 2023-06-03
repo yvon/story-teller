@@ -2,23 +2,20 @@ mod chat;
 mod interraction;
 mod narrator;
 
-use narrator::{BasicNarrator, Narrator};
+use narrator::BasicNarrator;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let narrator = BasicNarrator::new();
     let mut chat_service = chat::Service::new();
 
-    let resp = chat_service
-        .query(&narrator.initial_prompt())
-        .await
-        .unwrap();
-
-    println!("{}", resp);
+    let mut prompt: String = narrator.initial_prompt().clone();
 
     loop {
-        let answer = interraction::read_answer();
-        let resp = chat_service.query(&answer).await?;
-        println!("{}", resp);
+        let resp = chat_service.query(&prompt).await.unwrap();
+        let story = narrator::parse_chat_message(&resp).unwrap();
+        interraction::display_story(&story);
+
+        prompt = interraction::read_choice();
     }
 }
