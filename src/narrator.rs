@@ -1,11 +1,15 @@
+use crate::chat::{Message, Role, Service};
 use serde::Deserialize;
-
-const INITIAL_PROMPT_PATH: &str = "initial_prompt.txt";
 
 #[derive(Deserialize)]
 pub struct Story {
     pub text: String,
     pub choices: Vec<String>,
+}
+
+#[derive(Deserialize)]
+pub struct SummaryResponse {
+    pub summary: String,
 }
 
 pub struct BasicNarrator {
@@ -15,7 +19,7 @@ pub struct BasicNarrator {
 impl BasicNarrator {
     pub fn new() -> Self {
         Self {
-            initial_prompt: initial_prompt(),
+            initial_prompt: read_prompt("initial_prompt.txt"),
         }
     }
 
@@ -28,9 +32,17 @@ pub fn parse_chat_message(message: &String) -> Result<Story, serde_json::Error> 
     serde_json::from_str(message)
 }
 
-fn initial_prompt() -> String {
-    std::fs::read_to_string(INITIAL_PROMPT_PATH).expect(&format!(
-        "Failed to read initial prompt from {}",
-        INITIAL_PROMPT_PATH
-    ))
+pub async fn summarize(service: &Service, messages: &Vec<Message>) -> String {
+    let mut messages = messages.clone();
+    messages.push(Message {
+        role: Role::User,
+        content: read_prompt("summarize.txt"),
+    });
+    let response_message = service.submit(&messages).await.unwrap();
+    let SummaryResponse { summary } = serde_json::from_str(&response_message.content).unwrap();
+    summary
+}
+
+fn read_prompt(path: &'static str) -> String {
+    std::fs::read_to_string(path).expect(&format!("Failed to read initial prompt from {}", path))
 }

@@ -23,6 +23,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         interraction::display_story(&story);
 
         messages.push(resp);
+        eprintln!(
+            "SUMMARIZE: {:?}",
+            narrator::summarize(&chat_service, &messages).await
+        );
         message.content = interraction::read_choice();
     }
 }
