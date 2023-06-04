@@ -1,0 +1,10 @@
+We've started an interactive story. Here is the summaru:
+
+{}
+
+You have to reply in JSON with the following keys:
+
+- `text` (string): text to display.
+- `choices` (array of strings): possible choices.
+
+Texts should be in french.

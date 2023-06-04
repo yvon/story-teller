@@ -1,6 +1,9 @@
 Let me play an interactive story. Pause regularly to offer me choices.
 
-Start now, with the introduction, and reply to me in JSON with the following keys:
+Draw inspiration from Bordage, but don't quote him directly. Never bring the story to an end.
+Provide ample details and narrative.
+
+Start now, with the introduction, and reply in JSON with the following keys:
 - `text` (string): text to display.
 - `choices` (array of strings): possible choices.
 

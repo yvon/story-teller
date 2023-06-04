@@ -1,12 +1,14 @@
 use crate::narrator::Story;
-use std::io::{stdin, stdout, BufRead, Write};
+use std::io::{stdout, Write};
+use tokio::io::{self, AsyncBufReadExt, BufReader};
 
-pub fn read_choice() -> String {
+pub async fn read_choice() -> String {
+    let mut reader = BufReader::new(io::stdin());
     let mut line = String::new();
-    stdin()
-        .lock()
+    reader
         .read_line(&mut line)
-        .expect("Failed to read line");
+        .await
+        .expect("failed to read line");
     line
 }
 

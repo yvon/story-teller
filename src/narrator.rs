@@ -1,5 +1,8 @@
-use crate::chat::{ApiResponse, Message, Role, Service};
+use crate::chat::{Message, Role};
+use message_manager::MessageManager;
 use serde::Deserialize;
+
+mod message_manager;
 
 #[derive(Deserialize)]
 pub struct Story {
@@ -7,25 +10,19 @@ pub struct Story {
     pub choices: Vec<String>,
 }
 
-#[derive(Deserialize)]
-pub struct SummaryResponse {
-    pub summary: String,
-}
-
 pub struct BasicNarrator {
-    service: Service,
-    messages: Vec<Message>,
+    message_manager: MessageManager,
     story: Story,
 }
 
 impl BasicNarrator {
-    pub async fn new(service: Service) -> Self {
-        let mut messages = vec![initial_message()];
-        let story = submit(&service, &mut messages).await;
+    pub async fn new() -> Self {
+        let mut message_manager = MessageManager::new(initial_message());
+        let first_message = message_manager.submit().await;
+        let story = parse_story(&first_message);
 
         Self {
-            service,
-            messages,
+            message_manager,
             story,
         }
     }
@@ -35,28 +32,21 @@ impl BasicNarrator {
     }
 
     pub async fn choose(&mut self, choice: String) {
-        let new_message = Message {
+        let message = Message {
             role: Role::User,
             content: choice,
         };
-        self.messages.push(new_message);
-        self.story = submit(&self.service, &mut self.messages).await;
+        let reply = self.message_manager.reply(message).await;
+        self.story = parse_story(&reply);
     }
 
-    // TODO: it's a POC, remove or rework
-    pub async fn summarize(&self) -> String {
-        let mut messages = self.messages.clone();
-
-        messages.push(Message {
-            role: Role::User,
-            content: read_prompt("summarize.txt"),
-        });
-
-        let response_message = self.service.submit_and_return_message(&messages).await;
-        let json_response: SummaryResponse =
-            serde_json::from_str(&response_message.content).unwrap();
-        json_response.summary
+    pub async fn post_processing(&mut self) {
+        self.message_manager.post_processing().await;
     }
+}
+
+pub fn read_prompt(path: &'static str) -> String {
+    std::fs::read_to_string(path).expect(&format!("Failed to read initial prompt from {}", path))
 }
 
 fn initial_message() -> Message {
@@ -68,15 +58,6 @@ fn initial_message() -> Message {
     }
 }
 
-fn read_prompt(path: &'static str) -> String {
-    std::fs::read_to_string(path).expect(&format!("Failed to read initial prompt from {}", path))
-}
-
-async fn submit(service: &Service, messages: &mut Vec<Message>) -> Story {
-    let api_response = service.submit(messages).await;
-    let response_message = api_response.choices.get(0).unwrap().message.clone();
-
-    eprintln!("Spent tokens: {}", api_response.usage.total_tokens);
-    messages.push(response_message.clone());
-    serde_json::from_str(&response_message.content).unwrap()
+fn parse_story(message: &Message) -> Story {
+    serde_json::from_str(&message.content).unwrap()
 }
