@@ -18,16 +18,22 @@ pub struct Message {
 #[derive(Deserialize, Debug)]
 pub struct ApiResponse {
     pub choices: Vec<Choice>,
-}
-
-pub struct Service {
-    client: reqwest::Client,
-    api_key: String,
+    pub usage: Usage,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Choice {
     pub message: Message,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Usage {
+    pub total_tokens: u32,
+}
+
+pub struct Service {
+    client: reqwest::Client,
+    api_key: String,
 }
 
 impl Service {
@@ -39,19 +45,22 @@ impl Service {
         }
     }
 
-    pub async fn submit(&self, messages: &Vec<Message>) -> reqwest::Result<Message> {
+    pub async fn submit_and_return_message(&self, messages: &Vec<Message>) -> Message {
+        let api_response = self.submit(messages).await;
+        api_response.choices.get(0).unwrap().message.clone()
+    }
+
+    pub async fn submit(&self, messages: &Vec<Message>) -> ApiResponse {
         eprintln!("SENDING {:?}", messages);
 
-        let parsed_json = self
-            .request(messages)
-            .await?
-            .error_for_status()?
+        self.request(messages)
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap()
             .json::<ApiResponse>()
-            .await?;
-
-        let choice = parsed_json.choices.get(0).unwrap();
-
-        Ok(choice.message.clone())
+            .await
+            .unwrap()
     }
 
     async fn request(&self, messages: &Vec<Message>) -> reqwest::Result<reqwest::Response> {

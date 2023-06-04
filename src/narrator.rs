@@ -1,4 +1,4 @@
-use crate::chat::{Message, Role, Service};
+use crate::chat::{ApiResponse, Message, Role, Service};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -52,7 +52,7 @@ impl BasicNarrator {
             content: read_prompt("summarize.txt"),
         });
 
-        let response_message = self.service.submit(&messages).await.unwrap();
+        let response_message = self.service.submit_and_return_message(&messages).await;
         let json_response: SummaryResponse =
             serde_json::from_str(&response_message.content).unwrap();
         json_response.summary
@@ -73,7 +73,10 @@ fn read_prompt(path: &'static str) -> String {
 }
 
 async fn submit(service: &Service, messages: &mut Vec<Message>) -> Story {
-    let response_message = service.submit(messages).await.unwrap();
+    let api_response = service.submit(messages).await;
+    let response_message = api_response.choices.get(0).unwrap().message.clone();
+
+    eprintln!("Spent tokens: {}", api_response.usage.total_tokens);
     messages.push(response_message.clone());
     serde_json::from_str(&response_message.content).unwrap()
 }
