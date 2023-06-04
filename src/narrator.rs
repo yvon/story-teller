@@ -13,34 +13,54 @@ pub struct SummaryResponse {
 }
 
 pub struct BasicNarrator {
-    initial_prompt: String,
+    service: Service,
+    messages: Vec<Message>,
 }
 
 impl BasicNarrator {
-    pub fn new() -> Self {
+    pub fn new(service: Service) -> Self {
+        let initial_prompt = read_prompt("initial_prompt.txt");
+
+        let inital_message = Message {
+            role: Role::User,
+            content: initial_prompt,
+        };
+
         Self {
-            initial_prompt: read_prompt("initial_prompt.txt"),
+            service,
+            messages: vec![inital_message],
         }
     }
 
-    pub fn initial_prompt(&self) -> &String {
-        &self.initial_prompt
+    pub fn choose(&mut self, choice: String) {
+        let new_message = Message {
+            role: Role::User,
+            content: choice,
+        };
+        self.messages.push(new_message);
     }
-}
 
-pub fn parse_chat_message(message: &String) -> Result<Story, serde_json::Error> {
-    serde_json::from_str(message)
-}
+    // TODO: naming
+    pub async fn submit(&mut self) -> Story {
+        let response_message = self.service.submit(&self.messages).await.unwrap();
+        self.messages.push(response_message.clone());
+        serde_json::from_str(&response_message.content).unwrap()
+    }
 
-pub async fn summarize(service: &Service, messages: &Vec<Message>) -> String {
-    let mut messages = messages.clone();
-    messages.push(Message {
-        role: Role::User,
-        content: read_prompt("summarize.txt"),
-    });
-    let response_message = service.submit(&messages).await.unwrap();
-    let SummaryResponse { summary } = serde_json::from_str(&response_message.content).unwrap();
-    summary
+    // TODO: it's a POC, remove or rework
+    pub async fn summarize(&self) -> String {
+        let mut messages = self.messages.clone();
+
+        messages.push(Message {
+            role: Role::User,
+            content: read_prompt("summarize.txt"),
+        });
+
+        let response_message = self.service.submit(&messages).await.unwrap();
+        let json_response: SummaryResponse =
+            serde_json::from_str(&response_message.content).unwrap();
+        json_response.summary
+    }
 }
 
 fn read_prompt(path: &'static str) -> String {
