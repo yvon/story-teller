@@ -15,36 +15,32 @@ pub struct SummaryResponse {
 pub struct BasicNarrator {
     service: Service,
     messages: Vec<Message>,
+    story: Story,
 }
 
 impl BasicNarrator {
-    pub fn new(service: Service) -> Self {
-        let initial_prompt = read_prompt("initial_prompt.txt");
-
-        let inital_message = Message {
-            role: Role::User,
-            content: initial_prompt,
-        };
+    pub async fn new(service: Service) -> Self {
+        let mut messages = vec![initial_message()];
+        let story = submit(&service, &mut messages).await;
 
         Self {
             service,
-            messages: vec![inital_message],
+            messages,
+            story,
         }
     }
 
-    pub fn choose(&mut self, choice: String) {
+    pub fn story(&self) -> &Story {
+        &self.story
+    }
+
+    pub async fn choose(&mut self, choice: String) {
         let new_message = Message {
             role: Role::User,
             content: choice,
         };
         self.messages.push(new_message);
-    }
-
-    // TODO: naming
-    pub async fn submit(&mut self) -> Story {
-        let response_message = self.service.submit(&self.messages).await.unwrap();
-        self.messages.push(response_message.clone());
-        serde_json::from_str(&response_message.content).unwrap()
+        self.story = submit(&self.service, &mut self.messages).await;
     }
 
     // TODO: it's a POC, remove or rework
@@ -63,6 +59,21 @@ impl BasicNarrator {
     }
 }
 
+fn initial_message() -> Message {
+    let initial_prompt = read_prompt("initial_prompt.txt");
+
+    Message {
+        role: Role::User,
+        content: initial_prompt,
+    }
+}
+
 fn read_prompt(path: &'static str) -> String {
     std::fs::read_to_string(path).expect(&format!("Failed to read initial prompt from {}", path))
+}
+
+async fn submit(service: &Service, messages: &mut Vec<Message>) -> Story {
+    let response_message = service.submit(messages).await.unwrap();
+    messages.push(response_message.clone());
+    serde_json::from_str(&response_message.content).unwrap()
 }
