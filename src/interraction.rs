@@ -1,4 +1,3 @@
-use crate::narrator::Story;
 use std::io::{stdout, Write};
 use tokio::io::{self, AsyncBufReadExt, BufReader};
 
@@ -12,11 +11,11 @@ pub async fn read_choice() -> String {
     line
 }
 
-pub fn display_story(story: &Story) {
+pub fn display(text: &String, choices: &Vec<String>) {
     let mut lock = stdout().lock();
 
-    println!("\n-----\n{}\n", story.text);
-    for (i, choice) in story.choices.iter().enumerate() {
+    println!("\n-----\n{}\n", text);
+    for (i, choice) in choices.iter().enumerate() {
         println!("  {}: {}", i + 1, choice);
     }
 

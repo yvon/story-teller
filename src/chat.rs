@@ -31,6 +31,7 @@ pub struct Usage {
     pub total_tokens: u32,
 }
 
+#[derive(Clone)]
 pub struct Service {
     client: reqwest::Client,
     api_key: String,

@@ -1,12 +1,13 @@
 use crate::chat::{Message, Role, Service};
-use serde::Deserialize;
-use tokio::task::{self, JoinHandle};
+use serde::{self, Deserialize};
+use tokio::stream::StreamExt;
+use tokio::task::{self, JoinHandle}; // make sure you have the `stream` feature enabled for tokio
 
 const TOKEN_THRESHOLD_FOR_SUMMARY: u32 = 1000;
 const TOKEN_THRESHOLD_FOR_REDUCE: u32 = 1500;
 
 #[derive(Deserialize)]
-pub struct Story {
+struct ChatResponse {
     pub text: String,
     pub choices: Vec<String>,
 }
@@ -16,79 +17,122 @@ struct SummaryResponse {
     pub summary: String,
 }
 
-pub struct BasicNarrator {
-    story: Option<Story>,
-    messages: Vec<Message>,
-    service: Service,
-    summarize_handle: Option<JoinHandle<(usize, String)>>,
+struct Variant {
+    new_messages: Vec<Message>,
+    text: String,
+    choices: Vec<String>,
     total_tokens: u32,
 }
 
-impl BasicNarrator {
-    pub fn new(service: Service) -> Self {
+pub struct BasicNarrator {
+    text: String,
+    messages: Vec<Message>,
+    total_tokens: u32,
+    choices: Vec<String>,
+    variants: Option<Vec<Variant>>,
+    summarize_handle: Option<JoinHandle<(usize, String)>>,
+    service: Service,
+}
+
+impl Variant {
+    async fn fetch(service: Service, previous_messages: &Vec<Message>, choice: String) -> Self {
+        let mut messages = previous_messages.clone();
+
+        let user_message = Message {
+            role: Role::User,
+            content: choice.clone(),
+        };
+
+        messages.push(user_message.clone());
+        let (response_message, total_tokens) = submit(&service, &messages).await;
+        let ChatResponse { choices, text } = parse_response(&response_message);
+
         Self {
-            messages: vec![initial_message()],
-            story: None,
+            new_messages: vec![user_message, response_message],
+            choices,
+            text,
+            total_tokens,
+        }
+    }
+}
+
+impl BasicNarrator {
+    pub async fn new(service: Service) -> Self {
+        let mut messages: Vec<Message> = vec![initial_message()];
+        let (response_message, total_tokens) = submit(&service, &messages).await;
+        let ChatResponse { choices, text } = parse_response(&response_message);
+
+        messages.push(response_message);
+
+        Self {
             service,
+            text,
+            messages,
+            total_tokens,
+            choices,
             summarize_handle: None,
-            total_tokens: 0,
+            variants: None,
         }
     }
 
-    pub async fn start(&mut self) {
-        let (response_message, total_tokens) = self.submit(&self.messages).await;
-
-        self.total_tokens = total_tokens;
-        self.story = Some(parse_story(&response_message));
-        self.messages.push(response_message);
+    pub fn text(&self) -> &String {
+        &self.text
     }
 
-    pub fn story(&self) -> &Option<Story> {
-        &self.story
+    pub fn choices(&self) -> &Vec<String> {
+        &self.choices
     }
 
-    pub async fn choose(&mut self, choice: String) {
-        let message = Message {
-            role: Role::User,
-            content: choice,
-        };
+    async fn progress(&mut self, index: usize) {
+        let variant = self.variants.take().unwrap().remove(index);
+        let mut new_messages = variant.new_messages;
 
-        self.messages.push(message);
-        let (response_message, total_tokens) = self.submit(&self.messages).await;
-
-        self.total_tokens = total_tokens;
-        self.story = Some(parse_story(&response_message));
-        self.messages.push(response_message);
+        self.messages.extend(new_messages.drain(..));
+        self.text = variant.text;
+        self.choices = variant.choices;
+        self.total_tokens = variant.total_tokens;
+        self.variants = None;
     }
 
     pub async fn post_processing(&mut self) {
-        if self.summarize_handle.is_none() {
-            if self.total_tokens > TOKEN_THRESHOLD_FOR_SUMMARY {
-                self.start_summarization()
+        self.reduction().await;
+
+        let handles = self.choices.iter().map(|choice| {
+            task::spawn(Variant::fetch(
+                self.service.clone(),
+                &self.messages.clone(),
+                choice.clone(),
+            ))
+        });
+
+        self.variants = Some(results);
+    }
+
+    pub async fn reduction(&mut self) {
+        match &self.summarize_handle {
+            None => {
+                if self.total_tokens > TOKEN_THRESHOLD_FOR_SUMMARY {
+                    self.initiate_message_reduction();
+                }
             }
-        } else if self.total_tokens > TOKEN_THRESHOLD_FOR_REDUCE {
-            self.reduce_messages().await;
+            Some(join_handle) => {
+                if self.total_tokens > TOKEN_THRESHOLD_FOR_REDUCE {
+                    self.finalize_message_reduction().await;
+                }
+            }
         }
     }
 
-    async fn submit(&self, messages: &Vec<Message>) -> (Message, u32) {
-        let api_response = self.service.submit(messages).await;
-        let response_message = api_response.choices.get(0).unwrap().message.clone();
-        let total_tokens = api_response.usage.total_tokens;
-
-        eprintln!("Total tokens: {}", self.total_tokens);
-
-        (response_message, total_tokens)
-    }
-
-    fn start_summarization(&mut self) {
+    // Starts the summarization process and returns a handle to the future.
+    fn initiate_message_reduction(&mut self) {
         let future = summarize(self.messages.clone());
         self.summarize_handle = Some(task::spawn(future));
     }
 
-    async fn reduce_messages(&mut self) {
-        let handle = self.summarize_handle.take().unwrap();
-        let (size, summary) = handle.await.unwrap();
+    // Waits for the summarization to complete, retrieves the result, and updates the messages.
+    async fn finalize_message_reduction(&mut self) {
+        let join_handle = self.summarize_handle.take().unwrap();
+        let (size, summary) = join_handle.await.unwrap();
         let prompt = format!(include_str!("reduce.txt"), summary);
         let new_head = vec![Message {
             role: Role::User,
@@ -111,8 +155,17 @@ fn initial_message() -> Message {
     }
 }
 
-fn parse_story(message: &Message) -> Story {
+fn parse_response(message: &Message) -> ChatResponse {
     serde_json::from_str(&message.content).unwrap()
+}
+
+async fn submit(service: &Service, messages: &Vec<Message>) -> (Message, u32) {
+    let api_response = service.submit(messages).await;
+    let response_message = api_response.choices.get(0).unwrap().message.clone();
+    let total_tokens = api_response.usage.total_tokens;
+
+    eprintln!("Total tokens: {}", total_tokens);
+    (response_message, total_tokens)
 }
 
 async fn summarize(mut messages: Vec<Message>) -> (usize, String) {
