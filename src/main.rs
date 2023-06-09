@@ -12,9 +12,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut narrator = BasicNarrator::new(service).await;
 
     loop {
-        display(narrator.text(), narrator.choices());
-        // Read STDIN asynchronously so we can perform post processing operations meanwhile.
-        let (choice, _) = tokio::join!(read_choice(), narrator.post_processing());
-        narrator.choose(choice).await;
+        display(narrator.story(), narrator.choices());
+        let choice = read_choice(narrator.post_processing()).await;
+        narrator.choose(choice);
     }
 }
