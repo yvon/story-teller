@@ -1,7 +1,5 @@
-use crate::narrator::Chapter;
 use std::io::{stdout, Write};
 use tokio::io::{self, AsyncBufReadExt, BufReader};
-use tokio::task::JoinHandle;
 
 fn valid_choice(choice: &String, cn_choices: &usize) -> Option<usize> {
     let choice_num = choice.trim().parse::<usize>();
@@ -18,9 +16,7 @@ async fn read_line() -> String {
     line
 }
 
-pub async fn read_choice(mut join_handles: Vec<JoinHandle<Chapter>>) -> Chapter {
-    let cn_choices = join_handles.len();
-
+pub async fn read_choice(cn_choices: usize) -> usize {
     loop {
         let choice = read_line().await;
         match valid_choice(&choice, &cn_choices) {
@@ -29,13 +25,7 @@ pub async fn read_choice(mut join_handles: Vec<JoinHandle<Chapter>>) -> Chapter 
                 continue;
             }
             Some(index) => {
-                println!("You've choosen {}", index);
-                let join_handle = join_handles.swap_remove(index);
-                if !join_handle.is_finished() {
-                    println!("Loading...");
-                }
-                let chapter = join_handle.await.unwrap();
-                return chapter;
+                return index;
             }
         }
     }

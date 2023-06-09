@@ -13,7 +13,10 @@ async fn main() {
 
     loop {
         display(story.text(), story.choices());
-        let chapter = read_choice(story.children().await).await;
-        story.choose(chapter);
+        let index = read_choice(story.choices().len()).await;
+        if !story.loaded(index) {
+            println!("Loading...");
+        }
+        story.choose(index).await;
     }
 }

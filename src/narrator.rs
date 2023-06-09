@@ -105,16 +105,19 @@ impl Chapter {
 pub struct Story {
     service: Service,
     current_chapter: Arc<Chapter>,
+    next_chapters: Vec<JoinHandle<Chapter>>,
 }
 
 impl Story {
     pub async fn new(service: Service) -> Self {
         let content = include_str!("initial_prompt.txt").to_string();
-        let current_chapter = Chapter::load(&service, None, content).await;
+        let current_chapter = Arc::new(Chapter::load(&service, None, content).await);
+        let next_chapters = next_chapters(&service, &current_chapter);
 
         Self {
             service,
-            current_chapter: Arc::new(current_chapter),
+            current_chapter,
+            next_chapters,
         }
     }
 
@@ -126,20 +129,28 @@ impl Story {
         &self.current_chapter.as_ref().choices
     }
 
-    pub fn choose(&mut self, chapter: Chapter) {
+    pub fn loaded(&self, index: usize) -> bool {
+        self.next_chapters[index].is_finished()
+    }
+
+    pub async fn choose(&mut self, index: usize) {
+        let chapter = self.next_chapters.swap_remove(index).await.unwrap();
         self.current_chapter = Arc::new(chapter);
+        self.next_chapters = next_chapters(&self.service, &self.current_chapter);
     }
+}
 
-    pub async fn children(&mut self) -> Vec<JoinHandle<Chapter>> {
-        self.choices()
-            .iter()
-            .map(|choice| {
-                let service = self.service.clone();
-                let content = choice.clone();
-                let parent = Some(self.current_chapter.clone());
+fn next_chapters(service: &Service, current_chapter: &Arc<Chapter>) -> Vec<JoinHandle<Chapter>> {
+    current_chapter
+        .as_ref()
+        .choices
+        .iter()
+        .map(|choice| {
+            let service = service.clone();
+            let content = choice.clone();
+            let parent = Some(current_chapter.clone());
 
-                tokio::task::spawn(async move { Chapter::load(&service, parent, content).await })
-            })
-            .collect()
-    }
+            tokio::task::spawn(async move { Chapter::load(&service, parent, content).await })
+        })
+        .collect()
 }
