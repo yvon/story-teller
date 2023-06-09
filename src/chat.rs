@@ -54,14 +54,18 @@ impl Service {
     pub async fn submit(&self, messages: &Vec<Message>) -> ApiResponse {
         eprintln!("SENDING {:?}", messages);
 
-        self.request(messages)
+        let response = self
+            .request(messages)
             .await
             .unwrap()
             .error_for_status()
             .unwrap()
             .json::<ApiResponse>()
             .await
-            .unwrap()
+            .unwrap();
+
+        eprintln!("RESPONSE {:?}", response);
+        response
     }
 
     async fn request(&self, messages: &Vec<Message>) -> reqwest::Result<reqwest::Response> {

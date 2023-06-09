@@ -1,7 +1,7 @@
-use futures::future::{select, Either};
-use futures::Future;
+use crate::narrator::Chapter;
 use std::io::{stdout, Write};
 use tokio::io::{self, AsyncBufReadExt, BufReader};
+use tokio::task::JoinHandle;
 
 fn valid_choice(choice: &String, cn_choices: &usize) -> Option<usize> {
     let choice_num = choice.trim().parse::<usize>();
@@ -18,36 +18,27 @@ async fn read_line() -> String {
     line
 }
 
-pub async fn read_choice(future: impl Future<Output = usize>) -> usize {
-    let read_line_future = Box::pin(read_line());
-    let future = Box::pin(future);
+pub async fn read_choice(mut join_handles: Vec<JoinHandle<Chapter>>) -> Chapter {
+    let cn_choices = join_handles.len();
 
-    match select(read_line_future, future).await {
-        Either::Left((line, pending)) => {
-            println!("Still fetching story, please wait...");
-            pending.await;
+    loop {
+        let choice = read_line().await;
+        match valid_choice(&choice, &cn_choices) {
+            None => {
+                println!("Invalid choice");
+                continue;
+            }
+            Some(index) => {
+                println!("You've choosen {}", index);
+                let join_handle = join_handles.swap_remove(index);
+                if !join_handle.is_finished() {
+                    println!("Loading...");
+                }
+                let chapter = join_handle.await.unwrap();
+                return chapter;
+            }
         }
-        Either::Right((a, b)) => {
-            eprintln!("Stories loaded");
-            b.await;
-        }
-    };
-
-    1
-    //  loop {
-    //      tokio::select! {
-
-    //          },
-    //          cn_choices = &mut future => {
-    //              if let Some(valid_choice) = valid_choice(&line, &cn_choices) {
-    //                  return valid_choice;
-    //              } else {
-    //                  println!("Invalid choice, please try again.");
-    //                  line.clear();
-    //              }
-    //          }
-    //      }
-    //  }
+    }
 }
 
 pub fn display(text: &String, choices: &Vec<String>) {

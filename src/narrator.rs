@@ -1,6 +1,6 @@
 use crate::chat::{Message, Role, Service};
 use serde::{self, Deserialize};
-use std::rc::Rc;
+use std::sync::Arc;
 use tokio::task::JoinHandle;
 
 const TOKEN_THRESHOLD_FOR_SUMMARY: u32 = 1000;
@@ -17,7 +17,14 @@ struct SummaryResponse {
     pub summary: String,
 }
 
-pub async fn submit(service: &Service, messages: &Vec<Message>) -> (Message, u32) {
+fn user_message(content: String) -> Message {
+    Message {
+        role: Role::User,
+        content,
+    }
+}
+
+async fn submit(service: &Service, messages: &Vec<Message>) -> (Message, u32) {
     let api_response = service.submit(messages).await;
     let response_message = api_response.choices.get(0).unwrap().message.clone();
     let total_tokens = api_response.usage.total_tokens;
@@ -43,117 +50,96 @@ fn parse_response(message: &Message) -> ChatResponse {
     serde_json::from_str(&message.content).unwrap()
 }
 
-type Parent = Option<Rc<Node>>;
+type Parent = Option<Arc<Chapter>>;
 
-struct Node {
-    story: String,
+pub struct Chapter {
+    text: String,
     query: Message,
     response: Message,
+    total_tokens: u32,
     choices: Vec<String>,
     parent: Parent,
 }
 
-fn collect_messages(node: &Node) -> Vec<Message> {
-    let mut messages = Vec::new();
-    let mut current_node = node;
-
-    // Loop until the parent of current node is None
-    while let Some(parent_node) = current_node.parent.as_ref() {
-        // Add the response and query to messages
-        messages.push(current_node.response.clone());
-        messages.push(current_node.query.clone());
-
-        // Traverse to parent
-        current_node = &**parent_node;
+fn collect_messages(parent: &Parent) -> Vec<Message> {
+    if parent.is_none() {
+        return Vec::new();
     }
 
-    // Don't forget to push the response and query of the root node
-    messages.push(current_node.response.clone());
-    messages.push(current_node.query.clone());
+    let mut current_chapter = parent.as_ref().unwrap();
+    let mut messages = Vec::new();
 
-    // Reverse the messages to maintain the chronological order
+    while let Some(parent_chapter) = current_chapter.parent.as_ref() {
+        messages.push(current_chapter.response.clone());
+        messages.push(current_chapter.query.clone());
+        current_chapter = parent_chapter;
+    }
+
+    messages.push(current_chapter.response.clone());
+    messages.push(current_chapter.query.clone());
     messages.reverse();
     messages
 }
 
-impl Node {
-    async fn new(service: &Service, content: String, parent: Parent) -> Self {
-        let mut messages = match &parent {
-            Some(node) => collect_messages(node.as_ref()),
-            None => Vec::new(),
-        };
-
-        let query = Message {
-            role: Role::User,
-            content,
-        };
+impl Chapter {
+    async fn load(service: &Service, parent: Parent, content: String) -> Self {
+        let mut messages = collect_messages(&parent);
+        let query = user_message(content);
 
         messages.push(query.clone());
 
-        let (response, _) = submit(&service, &messages).await;
+        let (response, total_tokens) = submit(&service, &messages).await;
         let parsed_response = parse_response(&response);
 
         Self {
+            total_tokens,
             parent,
             query,
             response,
-            story: parsed_response.text,
+            text: parsed_response.text,
             choices: parsed_response.choices,
         }
     }
 }
 
-pub struct BasicNarrator {
+pub struct Story {
     service: Service,
-    current_node: Rc<Node>,
-    children_handles: Option<Vec<JoinHandle<Node>>>,
+    current_chapter: Arc<Chapter>,
 }
 
-impl BasicNarrator {
+impl Story {
     pub async fn new(service: Service) -> Self {
         let content = include_str!("initial_prompt.txt").to_string();
-        let current_node = Node::new(&service, content, None).await;
+        let current_chapter = Chapter::load(&service, None, content).await;
 
         Self {
             service,
-            current_node: Rc::new(current_node),
-            children_handles: None,
+            current_chapter: Arc::new(current_chapter),
         }
     }
 
-    pub fn story(&self) -> &String {
-        &self.current_node.as_ref().story
+    pub fn text(&self) -> &String {
+        &self.current_chapter.as_ref().text
     }
 
     pub fn choices(&self) -> &Vec<String> {
-        &self.current_node.as_ref().choices
+        &self.current_chapter.as_ref().choices
     }
 
-    pub async fn post_processing(&mut self) -> usize {
-        let children = self.children().await;
-        let len = children.len();
-
-        self.children = Some(children);
-        len
+    pub fn choose(&mut self, chapter: Chapter) {
+        self.current_chapter = Arc::new(chapter);
     }
 
-    pub fn choose(&mut self, index: usize) {
-        let chosen_node = self.children.take().unwrap().swap_remove(index);
-        self.current_node = Rc::new(chosen_node);
-    }
-
-    async fn children(&mut self) {
-        self.children_handles = self
-            .current_node
-            .choices
+    pub async fn children(&mut self) -> Vec<JoinHandle<Chapter>> {
+        self.choices()
             .iter()
             .map(|choice| {
                 let service = self.service.clone();
                 let content = choice.clone();
-                let parent = Some(self.current_node.clone());
+                let parent = Some(self.current_chapter.clone());
 
-                tokio::task::spawn(async move { Node::new(&service, content, parent).await })
+                tokio::task::spawn(async move { Chapter::load(&service, parent, content).await })
             })
-            .collect();
+            .collect()
     }
 }
