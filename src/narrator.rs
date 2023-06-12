@@ -123,12 +123,9 @@ impl Story {
         story
     }
 
-    pub fn text(&self) -> &String {
-        &self.current_chapter.as_ref().text
-    }
-
-    pub fn choices(&self) -> &Vec<String> {
-        &self.current_chapter.as_ref().choices
+    pub fn chapter(&self) -> (&String, &Vec<String>) {
+        let current_chapter = self.current_chapter.as_ref();
+        (&current_chapter.text, &current_chapter.choices)
     }
 
     pub fn loaded(&self, index: usize) -> bool {
