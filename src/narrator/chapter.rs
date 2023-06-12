@@ -15,7 +15,11 @@ pub struct Chapter {
 
 impl Chapter {
     pub async fn load(service: &Service, parent: Parent, content: String) -> Self {
-        let mut messages = collect_messages(&parent);
+        let mut messages = match &parent {
+            Some(chapter_ref) => collect_messages(chapter_ref.as_ref()),
+            None => Vec::new(),
+        };
+
         let query = user_message(content);
 
         messages.push(query.clone());
@@ -40,6 +44,10 @@ impl Chapter {
     pub fn choices(&self) -> &Vec<String> {
         &self.choices
     }
+
+    pub fn messages(&self) -> Vec<Message> {
+        collect_messages(self)
+    }
 }
 
 async fn submit(service: &Service, messages: &Vec<Message>) -> (Message, u32) {
@@ -51,12 +59,7 @@ async fn submit(service: &Service, messages: &Vec<Message>) -> (Message, u32) {
     (response_message, total_tokens)
 }
 
-fn collect_messages(parent: &Parent) -> Vec<Message> {
-    if parent.is_none() {
-        return Vec::new();
-    }
-
-    let mut current_chapter = parent.as_ref().unwrap();
+fn collect_messages(mut current_chapter: &Chapter) -> Vec<Message> {
     let mut messages = Vec::new();
 
     while let Some(parent_chapter) = current_chapter.parent.as_ref() {

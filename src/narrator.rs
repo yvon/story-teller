@@ -1,7 +1,8 @@
-use crate::chat::Service;
+use crate::chat::{Message, Service};
 use chapter::Chapter;
-use std::sync::Arc;
-use tokio::task::JoinHandle;
+use std::sync::{Arc, Mutex};
+use summarize::SummarizedChapter;
+use tokio::task::{spawn, JoinHandle};
 
 mod chapter;
 mod messages;
@@ -11,6 +12,7 @@ pub struct Story {
     service: Service,
     current_chapter: Arc<Chapter>,
     next_chapters: Vec<JoinHandle<Chapter>>,
+    summarized_chapter: Option<JoinHandle<SummarizedChapter>>,
 }
 
 impl Story {
@@ -22,6 +24,7 @@ impl Story {
             service,
             current_chapter: Arc::new(chapter),
             next_chapters: Vec::new(),
+            summarized_chapter: None,
         };
 
         story.preload_next_chapters();
@@ -41,6 +44,7 @@ impl Story {
         let chapter = self.next_chapters.swap_remove(index).await.unwrap();
         self.current_chapter = Arc::new(chapter);
         self.preload_next_chapters();
+        self.initiate_summary_creation();
     }
 
     fn preload_next_chapters(&mut self) {
@@ -54,8 +58,16 @@ impl Story {
                 let content = choice.clone();
                 let parent = Some(self.current_chapter.clone());
 
-                tokio::task::spawn(async move { Chapter::load(&service, parent, content).await })
+                spawn(async move { Chapter::load(&service, parent, content).await })
             })
             .collect()
+    }
+
+    fn initiate_summary_creation(&mut self) {
+        let service = self.service.clone();
+        let chapter = self.current_chapter.clone();
+        let join_handle = spawn(SummarizedChapter::new(service, chapter));
+
+        self.summarized_chapter = Some(join_handle);
     }
 }
