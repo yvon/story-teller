@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::env;
+use std::sync::Arc;
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "lowercase")]
@@ -9,10 +10,12 @@ pub enum Role {
     System,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct Message {
     pub role: Role,
     pub content: String,
+    #[serde(skip)]
+    pub parent: Option<Arc<Message>>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -46,11 +49,6 @@ impl Service {
         }
     }
 
-    pub async fn submit_and_return_message(&self, messages: &Vec<Message>) -> Message {
-        let api_response = self.submit(messages).await;
-        api_response.choices.get(0).unwrap().message.clone()
-    }
-
     pub async fn submit(&self, messages: &Vec<Message>) -> ApiResponse {
         eprintln!("SENDING {:?}", messages);
 
@@ -81,9 +79,48 @@ impl Service {
     }
 }
 
+impl Message {
+    pub fn messages(&self) -> Vec<Message> {
+        let mut messages = vec![self.clone()];
+        let mut parent = &self.parent;
+
+        while let Some(message_ref) = parent {
+            let message = message_ref.as_ref();
+            messages.push(message.clone());
+            parent = &message.parent;
+        }
+
+        messages.reverse();
+        messages
+    }
+}
+
+impl ApiResponse {
+    pub fn message(&self) -> Message {
+        self.choices.get(0).unwrap().message.clone()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_messages_chain() {
+        let parent = Message {
+            role: Role::User,
+            content: "a".to_string(),
+            parent: None,
+        };
+
+        let child = Message {
+            role: Role::User,
+            content: "b".to_string(),
+            parent: Some(Arc::new(parent.clone())),
+        };
+
+        assert_eq!(child.messages(), vec![parent, child]);
+    }
 
     #[test]
     fn test_message_deserialization() {
@@ -103,6 +140,7 @@ mod tests {
         let message = Message {
             role: Role::User,
             content: "Hello, world!".to_string(),
+            parent: None,
         };
 
         let json = serde_json::to_string(&message).unwrap();

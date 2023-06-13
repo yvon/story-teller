@@ -10,10 +10,3 @@ pub struct ChatResponse {
 pub fn parse_response(message: &Message) -> ChatResponse {
     serde_json::from_str(&message.content).unwrap()
 }
-
-pub fn user_message(content: String) -> Message {
-    Message {
-        role: Role::User,
-        content,
-    }
-}
