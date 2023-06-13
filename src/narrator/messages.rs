@@ -1,4 +1,4 @@
-use crate::chat::{Message, Role};
+use crate::chat::Message;
 use serde::{self, Deserialize};
 
 #[derive(Deserialize)]

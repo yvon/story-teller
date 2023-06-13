@@ -1,10 +1,9 @@
 use crate::chat::{Message, Role, Service};
-use crate::narrator::Chapter;
 use serde::{self, Deserialize};
 use std::sync::Arc;
 
-pub struct SummarizedChapter {
-    pub chapter: Arc<Chapter>,
+pub struct Summary {
+    pub message: Arc<Message>,
     content: String,
 }
 
@@ -13,24 +12,22 @@ struct SummaryResponse {
     pub summary: String,
 }
 
-// impl SummarizedChapter {
-//     pub async fn new(service: Service, chapter: Arc<Chapter>) -> Self {
-//         let messages = chapter.as_ref().messages();
-//
-//         Self {
-//             chapter,
-//             content: summarize(&service, messages).await,
-//         }
+// impl Summary {
+//     pub async fn new(service: Service, message: Arc<Message>) -> Self {
+//         let content = summarize(&service, message.clone()).await;
+//         Self { message, content }
 //     }
 // }
 //
-// async fn summarize(service: &Service, mut messages: Vec<Message>) -> String {
-//     messages.push(Message {
+// async fn summarize(service: &Service, message: Arc<Message>) -> String {
+//     let query = Message {
 //         role: Role::User,
 //         content: include_str!("summarize.txt").to_string(),
-//     });
+//         parent: Some(message),
+//     };
 //
-//     let response_message = service.submit_and_return_message(&messages).await;
+//     let api_response = service.submit(&query.messages()).await;
+//     let response_message = api_response.message();
 //     let json_response: SummaryResponse = serde_json::from_str(&response_message.content).unwrap();
 //
 //     eprintln!("SUMMARY: {}", json_response.summary);

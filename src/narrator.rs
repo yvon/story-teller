@@ -1,7 +1,7 @@
 use crate::chat::{Message, Service};
 use chapter::Chapter;
-use std::sync::Arc;
-use summarize::SummarizedChapter;
+use std::sync::{Arc, RwLock};
+use summarize::Summary;
 use tokio::task::{spawn, JoinHandle};
 
 mod chapter;
@@ -15,7 +15,7 @@ pub struct Story {
     service: Service,
     current_chapter: Chapter,
     next_chapters: Vec<JoinHandle<Chapter>>,
-    summarized_chapter: Option<JoinHandle<SummarizedChapter>>,
+    summary: Option<JoinHandle<Summary>>,
 }
 
 impl Story {
@@ -27,7 +27,7 @@ impl Story {
             service,
             current_chapter: chapter,
             next_chapters: Vec::new(),
-            summarized_chapter: None,
+            summary: None,
         };
 
         story.preload_next_chapters();
@@ -58,7 +58,7 @@ impl Story {
             .map(|choice| {
                 let service = self.service.clone();
                 let content = choice.clone();
-                let parent = Some(self.current_chapter.message());
+                let parent = Some(self.current_chapter.message().clone());
 
                 spawn(async move { Chapter::load(&service, parent, content).await })
             })
@@ -77,16 +77,17 @@ impl Story {
 
     // fn initiate_summary_creation(&mut self) {
     //     let service = self.service.clone();
-    //     let chapter = self.current_chapter.clone();
-    //     let join_handle = spawn(SummarizedChapter::new(service, chapter));
+    //     let message = self.current_chapter.message();
+    //     let join_handle = spawn(Summary::new(service, message));
 
-    //     self.summarized_chapter = Some(join_handle);
+    //     self.summary = Some(join_handle);
     // }
 
     // async fn reduce_history(&mut self) {
-    //     let summarized_chapter = &self.summarized_chapter;
+    //     let result = self.summary.take().unwrap().await;
+    //     let summary = result.unwrap();
 
-    //     let mut a = summarized_chapter.unwrap().await.unwrap().chapter.as_ref();
-    //     a.parent = None;
+    //     let mut message = summary.message.as_ref();
+    //     message.parent = None;
     // }
 }

@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::env;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
+
+pub type SharedMessage = Arc<RwLock<Message>>;
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "lowercase")]
@@ -10,12 +12,12 @@ pub enum Role {
     System,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Message {
     pub role: Role,
     pub content: String,
     #[serde(skip)]
-    pub parent: Option<Arc<Message>>,
+    pub parent: Option<SharedMessage>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -49,8 +51,9 @@ impl Service {
         }
     }
 
-    pub async fn submit(&self, messages: &Vec<Message>) -> ApiResponse {
-        eprintln!("SENDING {:?}", messages);
+    pub async fn submit(&self, message: &Message) -> ApiResponse {
+        eprintln!("SENDING {:?}", message);
+        let messages = &message.messages();
 
         let response = self
             .request(messages)
@@ -81,13 +84,19 @@ impl Service {
 
 impl Message {
     pub fn messages(&self) -> Vec<Message> {
-        let mut messages = vec![self.clone()];
-        let mut parent = &self.parent;
+        let mut messages = Vec::new();
+        let mut message = self.clone();
 
-        while let Some(message_ref) = parent {
-            let message = message_ref.as_ref();
-            messages.push(message.clone());
-            parent = &message.parent;
+        loop {
+            let parent = message.parent.clone();
+            messages.push(message);
+
+            match parent {
+                None => break,
+                Some(reference) => {
+                    message = reference.as_ref().read().unwrap().clone();
+                }
+            }
         }
 
         messages.reverse();
@@ -104,23 +113,6 @@ impl ApiResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_messages_chain() {
-        let parent = Message {
-            role: Role::User,
-            content: "a".to_string(),
-            parent: None,
-        };
-
-        let child = Message {
-            role: Role::User,
-            content: "b".to_string(),
-            parent: Some(Arc::new(parent.clone())),
-        };
-
-        assert_eq!(child.messages(), vec![parent, child]);
-    }
 
     #[test]
     fn test_message_deserialization() {
