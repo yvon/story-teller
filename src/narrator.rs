@@ -1,6 +1,5 @@
-use crate::chat::{Message, Service};
+use crate::chat::Service;
 use chapter::Chapter;
-use std::sync::{Arc, RwLock};
 use summarize::Summary;
 use tokio::task::{spawn, JoinHandle};
 
@@ -45,7 +44,7 @@ impl Story {
     pub async fn choose(&mut self, index: usize) {
         let chapter = self.next_chapters.swap_remove(index).await.unwrap();
 
-        // self.handle_token_thresholds(&chapter);
+        self.handle_token_thresholds(&chapter).await;
         self.current_chapter = chapter;
         self.preload_next_chapters();
     }
@@ -65,29 +64,31 @@ impl Story {
             .collect()
     }
 
-    // fn handle_token_thresholds(&mut self, chapter: &Chapter) {
-    //     let tokens = chapter.total_tokens();
+    async fn handle_token_thresholds(&mut self, chapter: &Chapter) {
+        let tokens = chapter.total_tokens();
 
-    //     if tokens > TOKEN_THRESHOLD_FOR_SUMMARY {
-    //         self.initiate_summary_creation();
-    //     } else if tokens > TOKEN_THRESHOLD_FOR_REDUCE {
-    //         self.reduce_history();
-    //     }
-    // }
+        if tokens > TOKEN_THRESHOLD_FOR_SUMMARY {
+            self.initiate_summary_creation();
+        } else if tokens > TOKEN_THRESHOLD_FOR_REDUCE {
+            self.reduce_history().await;
+        }
+    }
 
-    // fn initiate_summary_creation(&mut self) {
-    //     let service = self.service.clone();
-    //     let message = self.current_chapter.message();
-    //     let join_handle = spawn(Summary::new(service, message));
+    fn initiate_summary_creation(&mut self) {
+        let service = self.service.clone();
+        let message = self.current_chapter.message().clone();
+        let join_handle = spawn(Summary::new(service, message));
 
-    //     self.summary = Some(join_handle);
-    // }
+        self.summary = Some(join_handle);
+    }
 
-    // async fn reduce_history(&mut self) {
-    //     let result = self.summary.take().unwrap().await;
-    //     let summary = result.unwrap();
+    async fn reduce_history(&mut self) {
+        let result = self.summary.take().unwrap().await;
+        let summary = result.unwrap();
+        let lock = summary.message.as_ref();
+        let mut message = lock.write().unwrap();
 
-    //     let mut message = summary.message.as_ref();
-    //     message.parent = None;
-    // }
+        message.parent = None;
+        message.content = summary.content;
+    }
 }
