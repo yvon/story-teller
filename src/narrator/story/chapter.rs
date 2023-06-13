@@ -1,5 +1,5 @@
 use crate::chat::{Message, Role, Service, SharedMessage};
-use crate::narrator::messages::parse_response;
+use serde::{self, Deserialize};
 use std::sync::{Arc, RwLock};
 
 pub struct Chapter {
@@ -7,6 +7,12 @@ pub struct Chapter {
     message: SharedMessage,
     total_tokens: u32,
     choices: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct ChatResponse {
+    pub text: String,
+    pub choices: Vec<String>,
 }
 
 impl Chapter {
@@ -52,4 +58,8 @@ async fn submit(service: &Service, message: &Message) -> (Message, u32) {
 
     eprintln!("Total tokens: {}", total_tokens);
     (response_message, total_tokens)
+}
+
+fn parse_response(message: &Message) -> ChatResponse {
+    serde_json::from_str(&message.content).unwrap()
 }

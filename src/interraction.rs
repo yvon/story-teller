@@ -2,6 +2,18 @@ use crate::narrator::Story;
 use std::io::{stdout, Write};
 use tokio::io::{self, AsyncBufReadExt, BufReader};
 
+pub async fn start(mut story: Story) {
+    loop {
+        let (text, choices) = story.chapter();
+        display(text, choices);
+        let index = read_choice(choices.len()).await;
+        if !story.loaded(index) {
+            println!("Loading...");
+        }
+        story.choose(index).await;
+    }
+}
+
 fn valid_choice(choice: &String, cn_choices: &usize) -> Option<usize> {
     let choice_num = choice.trim().parse::<usize>();
     match choice_num {
@@ -42,16 +54,4 @@ fn display(text: &String, choices: &Vec<String>) {
 
     print!("\n> ");
     lock.flush().unwrap();
-}
-
-pub async fn start(mut story: Story) {
-    loop {
-        let (text, choices) = story.chapter();
-        display(text, choices);
-        let index = read_choice(choices.len()).await;
-        if !story.loaded(index) {
-            println!("Loading...");
-        }
-        story.choose(index).await;
-    }
 }
