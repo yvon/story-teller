@@ -1,4 +1,5 @@
-use crate::chat::{Message, Role, Service, SharedMessage};
+use crate::chat::{Message, Role, Service};
+use crate::narrator::linked_messages::{LinkedMessage, SharedMessage};
 use serde::{self, Deserialize};
 
 pub struct Summary {
@@ -18,14 +19,18 @@ impl Summary {
     }
 }
 
-async fn summarize(service: &Service, message: SharedMessage) -> String {
+async fn summarize(service: &Service, parent: SharedMessage) -> String {
     let query = Message {
         role: Role::User,
         content: include_str!("summarize.txt").to_string(),
-        parent: Some(message),
     };
 
-    let api_response = service.submit(&query).await;
+    let linked_message = LinkedMessage {
+        message: query,
+        parent: Some(parent),
+    };
+
+    let api_response = service.submit(&linked_message.messages()).await;
     let response_message = api_response.message();
     let json_response: SummaryResponse = serde_json::from_str(&response_message.content).unwrap();
 

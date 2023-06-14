@@ -87,6 +87,6 @@ impl Story {
         let mut message = lock.write().unwrap();
 
         message.parent = None;
-        message.content = summary.content;
+        message.message.content = summary.content;
     }
 }

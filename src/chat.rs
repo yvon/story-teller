@@ -1,8 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::env;
-use std::sync::{Arc, RwLock};
-
-pub type SharedMessage = Arc<RwLock<Message>>;
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "lowercase")]
@@ -16,8 +13,6 @@ pub enum Role {
 pub struct Message {
     pub role: Role,
     pub content: String,
-    #[serde(skip)]
-    pub parent: Option<SharedMessage>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -51,9 +46,8 @@ impl Service {
         }
     }
 
-    pub async fn submit(&self, message: &Message) -> ApiResponse {
-        eprintln!("SENDING {:?}", message);
-        let messages = &message.messages();
+    pub async fn submit(&self, messages: &Vec<Message>) -> ApiResponse {
+        eprintln!("SENDING {:?}", messages);
 
         let response = self
             .request(messages)
@@ -79,28 +73,6 @@ impl Service {
             }))
             .send()
             .await
-    }
-}
-
-impl Message {
-    pub fn messages(&self) -> Vec<Message> {
-        let mut messages = Vec::new();
-        let mut message = self.clone();
-
-        loop {
-            let parent = message.parent.clone();
-            messages.push(message);
-
-            match parent {
-                None => break,
-                Some(reference) => {
-                    message = reference.as_ref().read().unwrap().clone();
-                }
-            }
-        }
-
-        messages.reverse();
-        messages
     }
 }
 
@@ -132,7 +104,6 @@ mod tests {
         let message = Message {
             role: Role::User,
             content: "Hello, world!".to_string(),
-            parent: None,
         };
 
         let json = serde_json::to_string(&message).unwrap();
