@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::env;
 
+mod request;
+
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum Role {
@@ -57,7 +59,7 @@ impl Service {
         }
     }
 
-    pub async fn submit(&self, messages: &Vec<Message>) -> ApiResponse {
+    pub async fn submit(&self, messages: Vec<Message>) -> ApiResponse {
         eprintln!("SENDING {:?}", messages);
 
         let response = self
@@ -74,14 +76,18 @@ impl Service {
         response
     }
 
-    async fn request(&self, messages: &Vec<Message>) -> reqwest::Result<reqwest::Response> {
+    async fn request(&self, messages: Vec<Message>) -> reqwest::Result<reqwest::Response> {
+        let body = request::Body {
+            messages,
+            model: String::from("gpt-3.5-turbo"),
+            functions: None,
+            function_call: None,
+        };
+
         self.client
             .post("https://api.openai.com/v1/chat/completions")
             .bearer_auth(&self.api_key)
-            .json(&serde_json::json!({
-                "model": "gpt-3.5-turbo",
-                "messages": messages
-            }))
+            .json(&serde_json::json!(body))
             .send()
             .await
     }
@@ -96,6 +102,15 @@ impl ApiResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    pub fn user_message() -> Message {
+        Message {
+            role: Role::User,
+            content: Some(String::from("Hello, world!")),
+            function_call: None,
+            name: None,
+        }
+    }
 
     #[test]
     fn test_message_deserialization() {
@@ -112,13 +127,7 @@ mod tests {
 
     #[test]
     fn test_message_serialization() {
-        let message = Message {
-            role: Role::User,
-            content: Some(String::from("Hello, world!")),
-            function_call: None,
-            name: None,
-        };
-
+        let message = user_message();
         let json = serde_json::to_string(&message).unwrap();
 
         assert_eq!(json, r#"{"role":"user","content":"Hello, world!"}"#);

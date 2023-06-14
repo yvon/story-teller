@@ -32,7 +32,7 @@ async fn summarize(service: &Service, parent: SharedMessage) -> String {
         parent: Some(parent),
     };
 
-    let api_response = service.submit(&linked_message.messages()).await;
+    let api_response = service.submit(linked_message.messages()).await;
     let response_message = api_response.message();
     let json_response: SummaryResponse =
         serde_json::from_str(&response_message.content.unwrap()).unwrap();
