@@ -1,3 +1,4 @@
+pub use request::Body;
 use serde::{Deserialize, Serialize};
 use std::env;
 
@@ -59,11 +60,11 @@ impl Service {
         }
     }
 
-    pub async fn submit(&self, messages: Vec<Message>) -> ApiResponse {
-        eprintln!("SENDING {:?}", messages);
+    pub async fn submit(&self, body: Body) -> ApiResponse {
+        eprintln!("SENDING {:#?}", body);
 
         let response = self
-            .request(messages)
+            .request(body)
             .await
             .unwrap()
             .error_for_status()
@@ -72,18 +73,11 @@ impl Service {
             .await
             .unwrap();
 
-        eprintln!("RESPONSE {:?}", response);
+        eprintln!("RESPONSE {:#?}", response);
         response
     }
 
-    async fn request(&self, messages: Vec<Message>) -> reqwest::Result<reqwest::Response> {
-        let body = request::Body {
-            messages,
-            model: String::from("gpt-3.5-turbo"),
-            functions: None,
-            function_call: None,
-        };
-
+    async fn request(&self, body: Body) -> reqwest::Result<reqwest::Response> {
         self.client
             .post("https://api.openai.com/v1/chat/completions")
             .bearer_auth(&self.api_key)

@@ -1,4 +1,4 @@
-use crate::chat::{Message, Role, Service};
+use crate::chat::{Body, Message, Role, Service};
 use crate::narrator::linked_messages::{LinkedMessage, SharedMessage};
 use serde::{self, Deserialize};
 use std::sync::{Arc, RwLock};
@@ -55,7 +55,12 @@ impl Chapter {
 }
 
 async fn submit(service: &Service, linked_message: &LinkedMessage) -> (Message, u32) {
-    let api_response = service.submit(linked_message.messages()).await;
+    let body = Body {
+        messages: linked_message.messages(),
+        ..Default::default()
+    };
+
+    let api_response = service.submit(body).await;
     let response_message = api_response.choices.get(0).unwrap().message.clone();
     let total_tokens = api_response.usage.total_tokens;
 

@@ -3,7 +3,7 @@ use jsonschema::JSONSchema;
 use serde::Serialize;
 use serde_json::Value;
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct Body {
     pub model: String,
     pub messages: Vec<Message>,
@@ -14,7 +14,7 @@ pub struct Body {
 }
 
 #[allow(dead_code)]
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub enum FunctionCall {
     #[serde(rename = "none")]
     None,
@@ -24,13 +24,24 @@ pub enum FunctionCall {
     Name(String),
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct Function {
     name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     parameters: Option<Value>,
+}
+
+impl Default for Body {
+    fn default() -> Self {
+        Self {
+            model: String::from("gpt-3.5-turbo-0613"),
+            messages: Vec::new(),
+            functions: None,
+            function_call: None,
+        }
+    }
 }
 
 impl Function {
