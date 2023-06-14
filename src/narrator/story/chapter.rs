@@ -20,7 +20,9 @@ impl Chapter {
     pub async fn load(service: &Service, parent: Option<SharedMessage>, content: String) -> Self {
         let message = Message {
             role: Role::User,
-            content,
+            content: Some(content),
+            name: None,
+            function_call: None,
         };
 
         let linked_message = LinkedMessage { message, parent };
@@ -62,5 +64,5 @@ async fn submit(service: &Service, linked_message: &LinkedMessage) -> (Message, 
 }
 
 fn parse_response(message: &Message) -> ChatResponse {
-    serde_json::from_str(&message.content).unwrap()
+    serde_json::from_str(&message.content.as_ref().unwrap()).unwrap()
 }

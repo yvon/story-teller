@@ -12,7 +12,18 @@ pub enum Role {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Message {
     pub role: Role,
-    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function_call: Option<FunctionCall>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct FunctionCall {
+    pub name: String,
+    pub arguments: String,
 }
 
 #[derive(Deserialize, Debug)]
@@ -96,14 +107,16 @@ mod tests {
         let message: Message = serde_json::from_str(json).unwrap();
 
         assert_eq!(message.role, Role::User);
-        assert_eq!(message.content, "Hello, world!");
+        assert_eq!(message.content, Some(String::from("Hello, world!")));
     }
 
     #[test]
     fn test_message_serialization() {
         let message = Message {
             role: Role::User,
-            content: "Hello, world!".to_string(),
+            content: Some(String::from("Hello, world!")),
+            function_call: None,
+            name: None,
         };
 
         let json = serde_json::to_string(&message).unwrap();

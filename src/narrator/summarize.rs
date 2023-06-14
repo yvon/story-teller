@@ -22,7 +22,9 @@ impl Summary {
 async fn summarize(service: &Service, parent: SharedMessage) -> String {
     let query = Message {
         role: Role::User,
-        content: include_str!("summarize.txt").to_string(),
+        content: Some(include_str!("summarize.txt").to_string()),
+        name: None,
+        function_call: None,
     };
 
     let linked_message = LinkedMessage {
@@ -32,7 +34,8 @@ async fn summarize(service: &Service, parent: SharedMessage) -> String {
 
     let api_response = service.submit(&linked_message.messages()).await;
     let response_message = api_response.message();
-    let json_response: SummaryResponse = serde_json::from_str(&response_message.content).unwrap();
+    let json_response: SummaryResponse =
+        serde_json::from_str(&response_message.content.unwrap()).unwrap();
 
     eprintln!("SUMMARY: {}", json_response.summary);
     json_response.summary
