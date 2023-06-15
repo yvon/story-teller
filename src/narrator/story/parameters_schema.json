@@ -6,7 +6,7 @@
       "type": "array",
       "items": { "type": "string" },
       "description": "Possible choices",
-      "minItems": 1,
+      "minItems": 0,
       "maxItems": 4
     }
   },
