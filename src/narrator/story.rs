@@ -54,7 +54,7 @@ impl Story {
             .iter()
             .map(|choice| {
                 let service = self.service.clone();
-                let content = choice.clone();
+                let content = format!(include_str!("next_chapter.txt"), choice.clone());
                 let parent = Some(self.current_chapter.message().clone());
 
                 spawn(async move { Chapter::load(&service, parent, content).await })
