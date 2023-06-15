@@ -1,8 +1,7 @@
-pub use request::Body;
 use serde::{Deserialize, Serialize};
 use std::env;
 
-mod request;
+pub mod request;
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "lowercase")]
@@ -60,28 +59,28 @@ impl Service {
         }
     }
 
-    pub async fn submit(&self, body: Body) -> ApiResponse {
-        eprintln!("SENDING {:#?}", body);
+    pub async fn submit(&self, body: request::Body) -> ApiResponse {
+        let response = self.request(body).await.unwrap();
+        let status = response.status();
+        let text = response.text().await.unwrap();
 
-        let response = self
-            .request(body)
-            .await
-            .unwrap()
-            .error_for_status()
-            .unwrap()
-            .json::<ApiResponse>()
-            .await
-            .unwrap();
+        if status.is_client_error() || status.is_server_error() {
+            panic!("Error: {}", text);
+        }
 
-        eprintln!("RESPONSE {:#?}", response);
-        response
+        let api_response: ApiResponse = serde_json::from_str(&text).unwrap();
+        eprintln!("RECEIVED {:#?}", api_response);
+        api_response
     }
 
-    async fn request(&self, body: Body) -> reqwest::Result<reqwest::Response> {
+    async fn request(&self, body: request::Body) -> reqwest::Result<reqwest::Response> {
+        let json = serde_json::to_string_pretty(&body).unwrap();
+        eprintln!("SENDING {}", &json);
+
         self.client
             .post("https://api.openai.com/v1/chat/completions")
             .bearer_auth(&self.api_key)
-            .json(&serde_json::json!(body))
+            .json(&body)
             .send()
             .await
     }

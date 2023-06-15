@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "properties": {
+    "text": { "type": "string", "description": "Text to display" },
+    "choices": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Possible choices",
+      "minItems": 1,
+      "maxItems": 4
+    }
+  },
+  "required": ["text", "choices"]
+}

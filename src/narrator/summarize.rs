@@ -1,4 +1,4 @@
-use crate::chat::{Body, Message, Role, Service};
+use crate::chat::{request, Message, Role, Service};
 use crate::narrator::linked_messages::{LinkedMessage, SharedMessage};
 use serde::{self, Deserialize};
 
@@ -32,7 +32,7 @@ async fn summarize(service: &Service, parent: SharedMessage) -> String {
         parent: Some(parent),
     };
 
-    let body = Body {
+    let body = request::Body {
         messages: linked_message.messages(),
         ..Default::default()
     };

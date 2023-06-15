@@ -21,16 +21,16 @@ pub enum FunctionCall {
     #[serde(rename = "auto")]
     Auto,
     #[serde(rename = "name")]
-    Name(String),
+    Name(&'static str),
 }
 
 #[derive(Serialize, Debug)]
 pub struct Function {
-    name: String,
+    pub name: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
-    description: Option<String>,
+    pub description: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    parameters: Option<Value>,
+    pub parameters: Option<Value>,
 }
 
 impl Default for Body {
@@ -46,8 +46,8 @@ impl Default for Body {
 
 impl Function {
     fn new(
-        name: String,
-        description: Option<String>,
+        name: &'static str,
+        description: Option<&'static str>,
         parameters: Option<Value>,
     ) -> Result<Self, &'static str> {
         if let Some(value) = &parameters {
@@ -90,20 +90,20 @@ mod tests {
     #[test]
     fn test_function_serialization() {
         let function = Function {
-            name: String::from("foo"),
-            description: Some(String::from("Doing stuff")),
+            name: "foo",
+            description: Some("Stuff"),
             parameters: None,
         };
 
         let json = serde_json::to_string(&function).unwrap();
 
-        assert_eq!(json, r#"{"name":"foo","description":"Doing stuff"}"#);
+        assert_eq!(json, r#"{"name":"foo","description":"Stuff"}"#);
     }
 
     #[test]
     fn test_valid_json_format() {
         let schema = json!({"maxLength": 5});
-        let function = Function::new(String::from("foo"), None, Some(schema)).unwrap();
+        let function = Function::new("foo", None, Some(schema)).unwrap();
         let json = serde_json::to_string(&function).unwrap();
         assert_eq!(json, r#"{"name":"foo","parameters":{"maxLength":5}}"#);
     }
@@ -111,7 +111,7 @@ mod tests {
     #[test]
     fn test_invalid_json_format() {
         let schema = json!({"type": "invalidType"});
-        let function = Function::new(String::from("foo"), None, Some(schema));
+        let function = Function::new("foo", None, Some(schema));
         assert!(function.is_err());
     }
 
@@ -138,7 +138,7 @@ mod tests {
             model: String::from("gpt-3.5-turbo"),
             messages: vec![user_message()],
             functions: None,
-            function_call: Some(FunctionCall::Name(String::from("foo"))),
+            function_call: Some(FunctionCall::Name("foo")),
         };
 
         let json = serde_json::to_string(&body).unwrap();
