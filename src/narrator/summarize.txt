@@ -1,2 +1,2 @@
-Can you summarize the story so far? Repond in french and in JSON with the following key:
+Can you summarize the story so far? Repond in JSON with the following key:
 - summary (string)

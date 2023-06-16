@@ -2,9 +2,4 @@ We've started an interactive story. Here is the summaru:
 
 {}
 
-You have to reply in JSON with the following keys:
-
-- `text` (string): text to display.
-- `choices` (array of strings): possible choices.
-
-Texts should be in french.
+The 'choices' key provides the options available to the reader. A minimum of two must be provided.

@@ -1,23 +1,3 @@
-Débutons une histoire interractive.
+Start an interactive story.
 
-Inspire toi des récits de Bordage, sans le citer directement. Copie son style,
-travaille ton récit. Évite les clichés, les personnages stéréotypés, les
-facilités narratives. Surpend ton lecteur avec un récit mature et travaillé.
-
-Pas de "Il était une fois", pas de "Il y a bien longtemps", pas de "Dans une
-galaxie lointaine, très lointaine", etc.
-
-N'introduits pas d'évènement perturbateur trop rapidement. Pas avant de
-nombreux messages d'exposition. 
-
-Développe l'exposition sur de nombreux messages. Le lecteur doit comprendre qui
-sont les personnages, où ils sont, ce qu'ils font, ce qu'ils pensent, ce qu'ils
-ressentent, etc. L'histoire doit commencer par les suivre dans leur vie
-quotidienne pour comprendre ce qui va les pousser à agir.
-
-A chaque étape de l'histoire offre au lecteur de décider de la suite. Il est
-important que les propositions que tu lui fais soient cohérentes avec le
-contexte de l'histoire.
-
-Les choix que tu offres au lecteur sont donnés dans la clef "choices" de la
-fonction "chapter". Il doit y en avoir minimum deux.
+The 'choices' key provides the options available to the reader. A minimum of two must be provided.
