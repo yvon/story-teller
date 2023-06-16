@@ -25,6 +25,7 @@ impl Request {
                     function_call: None,
                 },
                 parent,
+                total_tokens: None,
             },
         }
     }
@@ -59,11 +60,10 @@ fn parameters() -> serde_json::Value {
 }
 
 fn functions() -> Vec<request::Function> {
-    vec![request::Function {
-        name: "chapter",
-        parameters: Some(parameters()),
-        description: None,
-    }]
+    let function =
+        request::Function::new("chapter", None, Some(parameters())).expect("Invalid JSON schema");
+
+    vec![function]
 }
 
 fn body(messages: Vec<Message>) -> request::Body {

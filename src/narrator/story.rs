@@ -1,9 +1,8 @@
-use super::{Chapter, Summary};
+use super::{message_above_threshold, Chapter, Summary};
 use crate::chat::Service;
 use tokio::task::{spawn, JoinHandle};
 
-const TOKEN_THRESHOLD_FOR_SUMMARY: u32 = 1000;
-const TOKEN_THRESHOLD_FOR_REDUCE: u32 = 1500;
+const TOKEN_THRESHOLD_FOR_REDUCE: u32 = 3500;
 
 pub struct Story {
     service: Service,
@@ -60,28 +59,25 @@ impl Story {
     }
 
     async fn handle_token_thresholds(&mut self, chapter: &Chapter) {
-        let tokens = chapter.total_tokens();
-
-        if tokens > TOKEN_THRESHOLD_FOR_SUMMARY {
-            self.initiate_summary_creation();
-        } else if tokens > TOKEN_THRESHOLD_FOR_REDUCE {
-            self.reduce_history().await;
+        if self.summary.is_none() {
+            if let Some(message) = message_above_threshold(chapter.message().clone()) {
+                let service = self.service.clone();
+                let join_handle = spawn(Summary::new(service, message));
+                self.summary = Some(join_handle);
+            }
         }
-    }
 
-    fn initiate_summary_creation(&mut self) {
-        let service = self.service.clone();
-        let message = self.current_chapter.message().clone();
-        let join_handle = spawn(Summary::new(service, message));
-
-        self.summary = Some(join_handle);
+        if let Some(value) = chapter.message().read().total_tokens {
+            if value > TOKEN_THRESHOLD_FOR_REDUCE {
+                self.reduce_history().await;
+            }
+        }
     }
 
     async fn reduce_history(&mut self) {
         let result = self.summary.take().unwrap().await;
         let summary = result.unwrap();
-        let lock = summary.message.as_ref();
-        let mut message = lock.write().unwrap();
+        let mut message = summary.message.write();
 
         message.parent = None;
         message.message.content = Some(summary.content);

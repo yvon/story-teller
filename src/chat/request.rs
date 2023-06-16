@@ -45,7 +45,7 @@ impl Default for Body {
 }
 
 impl Function {
-    fn new(
+    pub fn new(
         name: &'static str,
         description: Option<&'static str>,
         parameters: Option<Value>,

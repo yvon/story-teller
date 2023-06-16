@@ -11,7 +11,7 @@ pub enum Role {
     System,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct Message {
     pub role: Role,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -22,7 +22,7 @@ pub struct Message {
     pub function_call: Option<FunctionCall>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct FunctionCall {
     pub name: String,
     pub arguments: String,
