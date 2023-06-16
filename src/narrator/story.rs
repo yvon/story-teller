@@ -1,9 +1,6 @@
+use super::{Chapter, Summary};
 use crate::chat::Service;
-use crate::narrator::summarize::Summary;
-use chapter::Chapter;
 use tokio::task::{spawn, JoinHandle};
-
-mod chapter;
 
 const TOKEN_THRESHOLD_FOR_SUMMARY: u32 = 1000;
 const TOKEN_THRESHOLD_FOR_REDUCE: u32 = 1500;

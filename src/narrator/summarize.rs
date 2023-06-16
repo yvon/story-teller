@@ -1,5 +1,5 @@
+use super::{LinkedMessage, SharedMessage};
 use crate::chat::{request, Message, Role, Service};
-use crate::narrator::linked_messages::{LinkedMessage, SharedMessage};
 use serde::{self, Deserialize};
 
 pub struct Summary {
