@@ -1,5 +1,0 @@
-We've started an interactive story. Here is the summaru:
-
-{}
-
-The 'choices' key provides the options available to the reader. A minimum of two must be provided.
